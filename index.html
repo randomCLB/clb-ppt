@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI赋能知识产权助力出海</title>
+<style>
+  :root{
+    --paper:#f8f9fa;
+    --ink:#0a1628;
+    --accent:#0052cc;
+    --accent-light:#e6f0ff;
+    --danger:#de350b;
+    --warning:#ff8b00;
+    --success:#36b37e;
+    --text-primary:#172b4d;
+    --text-secondary:#5e6c84;
+    --text-helper:#8993a4;
+    --border:#dfe1e6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  
+  /* ============ 翻页容器 ============ */
+  #deck{position:fixed;top:0;left:0;width:10000vw;height:100vh;display:flex;flex-wrap:nowrap;transition:transform .8s cubic-bezier(.77,0,.175,1);z-index:10;will-change:transform}
+  .slide{width:100vw;height:100vh;flex:0 0 100vw;position:relative;overflow:hidden;background:var(--paper);display:flex;flex-direction:column}
+  
+  /* ============ 模式切换 ============ */
+  .slide .img-mode{position:absolute;inset:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease, transform .5s ease}
+  .slide .text-mode{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;transition:opacity .5s ease, transform .5s ease;transform:scale(1.02);padding:6vh 5vw;display:flex;flex-direction:column;overflow:auto}
+  .slide.clear-mode .img-mode{opacity:0;transform:scale(.98);pointer-events:none}
+  .slide.clear-mode .text-mode{opacity:1;pointer-events:auto;transform:scale(1)}
+  .slide.clear-mode.no-text-mode .img-mode{opacity:1;transform:scale(1);pointer-events:auto}
+  .slide.clear-mode.no-text-mode .text-mode{display:none}
+  
+  /* ============ 图片模式 ============ */
+  .img-mode img{max-width:95%;max-height:95%;width:auto;height:auto;object-fit:contain;box-shadow:0 12px 48px rgba(0,0,0,.2);border-radius:4px}
+  .img-mode.full-bleed img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:cover;border-radius:0}
+  .img-mode .zoom-hint{position:absolute;bottom:3vh;left:50%;transform:translateX(-50%);background:rgba(10,22,40,.8);color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .3s}
+  .slide.active .img-mode .zoom-hint{opacity:1}
+  .slide.active .img-mode .zoom-hint{animation:fadeInUp .5s ease .8s both}
+  
+  /* ============ 文字模式 ============ */
+  .text-mode h1{font-size:clamp(42px,5.5vw,90px);font-weight:800;line-height:1.1;color:var(--text-primary);letter-spacing:-.02em;margin-bottom:3vh}
+  .text-mode h2{font-size:clamp(28px,3.5vw,56px);font-weight:700;line-height:1.2;color:var(--text-primary);letter-spacing:-.01em;margin-bottom:2vh}
+  .text-mode h3{font-size:clamp(22px,2.5vw,40px);font-weight:600;line-height:1.3;color:var(--text-primary);margin-bottom:1.5vh}
+  .text-mode p,.text-mode li{font-size:clamp(18px,1.5vw,28px);line-height:1.6;color:var(--text-secondary);margin-bottom:1.2vh}
+  .text-mode .lead{font-size:clamp(20px,1.8vw,32px);color:var(--text-primary);font-weight:500}
+  .text-mode .big-num{font-size:clamp(56px,7vw,120px);font-weight:800;color:var(--accent);line-height:1;display:block;margin:2vh 0}
+  .text-mode .kicker{font-size:clamp(13px,1vw,18px);text-transform:uppercase;letter-spacing:.2em;color:var(--accent);font-weight:600;margin-bottom:1.5vh}
+  .text-mode .card{background:var(--accent-light);border-radius:12px;padding:3vh 2.5vw;margin:1vh 0;border-left:4px solid var(--accent)}
+  .text-mode .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:3vw;margin-top:2vh}
+  .text-mode .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:2vw;margin-top:2vh}
+  .text-mode .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:2vw;margin-top:2vh}
+  .text-mode .stat-card{text-align:center;padding:3vh 2vw;background:#fff;border-radius:12px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .text-mode .stat-card .num{font-size:clamp(36px,4.5vw,72px);font-weight:800;color:var(--accent);line-height:1}
+  .text-mode .stat-card .label{font-size:clamp(14px,1.2vw,20px);color:var(--text-secondary);margin-top:1vh}
+  .text-mode .stat-card .change{font-size:clamp(13px,1vw,18px);color:var(--success);margin-top:.5vh;font-weight:500}
+  .text-mode .stat-card .change.up{color:var(--danger)}
+  .text-mode ul{list-style:none;padding:0}
+  .text-mode ul li{padding-left:1.5em;position:relative}
+  .text-mode ul li::before{content:"›";position:absolute;left:0;color:var(--accent);font-weight:700;font-size:1.2em}
+  .text-mode .highlight{color:var(--accent);font-weight:600}
+  .text-mode .danger{color:var(--danger);font-weight:600}
+  .text-mode .warning{color:var(--warning);font-weight:600}
+  .text-mode .success{color:var(--success);font-weight:600}
+  
+  /* ============ 流程图 ============ */
+  .flow-step{text-align:center;padding:2vh 1vw;position:relative}
+  .flow-step .icon{width:64px;height:64px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5vh;color:#fff;font-size:28px;font-weight:700}
+  .flow-step h4{font-size:clamp(18px,1.5vw,26px);font-weight:700;color:var(--text-primary);margin-bottom:1vh}
+  .flow-step p{font-size:clamp(14px,1.1vw,20px);color:var(--text-secondary);line-height:1.5}
+  .flow-arrow{position:absolute;right:-2vw;top:50%;transform:translateY(-50%);font-size:32px;color:var(--accent);font-weight:700}
+  
+  /* ============ 导航控件 ============ */
+  #nav{position:fixed;right:2vw;bottom:2vh;z-index:100;display:flex;align-items:center;gap:8px;background:rgba(10,22,40,.85);backdrop-filter:blur(12px);padding:6px 10px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+  #nav button{width:32px;height:32px;border:none;border-radius:50%;background:transparent;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+  #nav button:hover{background:rgba(255,255,255,.15)}
+  #nav .page-num{color:#fff;font-size:12px;font-weight:600;min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
+  #nav .toggle-btn{font-size:11px;letter-spacing:.05em;padding:0 8px;border-radius:20px;background:rgba(255,255,255,.15);white-space:nowrap}
+  #nav .toggle-btn.active{background:var(--accent)}
+  
+  #progress{position:fixed;top:0;left:0;height:4px;background:var(--accent);z-index:100;transition:width .4s ease}
+  
+  /* ============ 动画 ============ */
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes scaleIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+  @keyframes slideInLeft{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes countUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  
+  .animate-fadeInUp{animation:fadeInUp .6s ease forwards}
+  .animate-scaleIn{animation:scaleIn .5s ease forwards}
+  .animate-slideInLeft{animation:slideInLeft .5s ease forwards}
+  .animate-slideInRight{animation:slideInRight .5s ease forwards}
+  .animate-countUp{animation:countUp .4s ease forwards}
+  
+  .delay-1{animation-delay:.1s}
+  .delay-2{animation-delay:.2s}
+  .delay-3{animation-delay:.3s}
+  .delay-4{animation-delay:.4s}
+  .delay-5{animation-delay:.5s}
+  .delay-6{animation-delay:.6s}
+  
+  .text-mode > *{opacity:0}
+  .slide.active .text-mode > *{animation:fadeInUp .5s ease forwards}
+  .slide.active .text-mode > *:nth-child(1){animation-delay:.05s}
+  .slide.active .text-mode > *:nth-child(2){animation-delay:.1s}
+  .slide.active .text-mode > *:nth-child(3){animation-delay:.15s}
+  .slide.active .text-mode > *:nth-child(4){animation-delay:.2s}
+  .slide.active .text-mode > *:nth-child(5){animation-delay:.25s}
+  .slide.active .text-mode > *:nth-child(6){animation-delay:.3s}
+  .slide.active .text-mode > *:nth-child(7){animation-delay:.35s}
+  .slide.active .text-mode > *:nth-child(8){animation-delay:.4s}
+  
+  /* ============ 响应式 ============ */
+  @media(max-aspect-ratio:16/9){.slide{height:100vw*9/16}}
+  @media(min-aspect-ratio:16/9){#deck{align-items:center;height:100vh}.slide{height:calc(100vw*9/16);max-height:100vh}}
+  
+  /* 提示 */
+  #hint{position:fixed;top:2vh;right:2vw;z-index:100;background:rgba(10,22,40,.8);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none}
+  #hint.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="hint">→ 翻页  |  C 清晰模式  |  F 全屏  |  点击画面切换</div>
+
+<div id="deck">
+
+<!-- ==================== PAGE 1: 封面 ==================== -->
+<section class="slide" data-index="0">
+  <div class="img-mode full-bleed"><img src="images/page-01.png" alt="封面"></div>
+  <div class="text-mode" style="justify-content:center;align-items:center;text-align:center;background:linear-gradient(135deg,#0a1628 0%,#1a3a6c 50%,#0052cc 100%)">
+    <div class="kicker" style="color:#7eb8ff">INTELLECTUAL PROPERTY SERVICE</div>
+    <h1 style="color:#fff;font-size:clamp(48px,7vw,120px)">AI赋能知识产权<br>助力出海</h1>
+    <p class="lead" style="color:rgba(255,255,255,.8);margin-top:3vh">上海技术交易所 × 智鸽科技 联合服务方案</p>
+    <div style="display:flex;gap:3vw;margin-top:5vh;justify-content:center">
+      <div style="text-align:center"><div style="font-size:clamp(28px,3vw,48px);color:#fff;font-weight:700">🏛</div><div style="color:rgba(255,255,255,.7);font-size:clamp(14px,1.2vw,20px);margin-top:1vh">国家级交易平台</div></div>
+      <div style="text-align:center"><div style="font-size:clamp(28px,3vw,48px);color:#fff;font-weight:700">🤖</div><div style="color:rgba(255,255,255,.7);font-size:clamp(14px,1.2vw,20px);margin-top:1vh">AI智能赋能</div></div>
+      <div style="text-align:center"><div style="font-size:clamp(28px,3vw,48px);color:#fff;font-weight:700">🌐</div><div style="color:rgba(255,255,255,.7);font-size:clamp(14px,1.2vw,20px);margin-top:1vh">全球化服务</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 2: 挑战 ==================== -->
+<section class="slide" data-index="1">
+  <div class="img-mode"><img src="images/page-02.png" alt="市场挑战"></div>
+  <div class="text-mode">
+    <div class="kicker">MARKET CHALLENGES</div>
+    <h1>AI泡沫下的<br>企业出海新挑战</h1>
+    <div class="grid-3">
+      <div class="stat-card">
+        <div class="num">447<span style="font-size:.5em">起</span></div>
+        <div class="label">专利诉讼新立案</div>
+        <div class="change up">↑ 56.1%</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">2371<span style="font-size:.5em">万$</span></div>
+        <div class="label">平均判赔额</div>
+        <div class="change">商标诉讼20倍</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">2452<span style="font-size:.5em">家次</span></div>
+        <div class="label">涉及企业</div>
+        <div class="change up">↑ 167.4%</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:3vh">
+      <h3>AI投资热潮与现实困境</h3>
+      <p>当前AI领域投资巨大，但企业仍需找到可行的商业模式。知识产权不仅是技术保护的工具，更是企业全球化竞争中的<span class="highlight">护城河和谈判筹码</span>。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 3: 风险 ==================== -->
+<section class="slide" data-index="2">
+  <div class="img-mode"><img src="images/page-03.png" alt="风险分析"></div>
+  <div class="text-mode">
+    <div class="kicker">RISK ANALYSIS</div>
+    <h1>企业出海面临的<br>知识产权风险全景</h1>
+    <div class="grid-3" style="margin-top:3vh">
+      <div class="stat-card" style="border-top:4px solid var(--danger)">
+        <div class="num" style="color:var(--danger)">一级</div>
+        <div class="label">高风险</div>
+        <p style="font-size:clamp(13px,1vw,18px);margin-top:1vh">专利侵权<br>商业秘密泄露<br>核心技术侵权</p>
+      </div>
+      <div class="stat-card" style="border-top:4px solid var(--warning)">
+        <div class="num" style="color:var(--warning)">二级</div>
+        <div class="label">中风险</div>
+        <p style="font-size:clamp(13px,1vw,18px);margin-top:1vh">品牌侵权<br>版权纠纷<br>技术审查</p>
+      </div>
+      <div class="stat-card" style="border-top:4px solid var(--success)">
+        <div class="num" style="color:var(--success)">三级</div>
+        <div class="label">低风险</div>
+        <p style="font-size:clamp(13px,1vw,18px);margin-top:1vh">专利检索<br>法律咨询<br>合同审查</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:3vh">
+      <p class="lead">中国企业在美知识产权诉讼<span class="danger">激增</span>：专利诉讼447起、商标诉讼719起、商业秘密23起、跨境电商案件1092起。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 4-8: 纯图片 ==================== -->
+<section class="slide no-text-mode" data-index="3">
+  <div class="img-mode full-bleed"><img src="images/page-04.png" alt=""><div class="zoom-hint">点击切换清晰模式</div></div>
+</section>
+<section class="slide no-text-mode" data-index="4">
+  <div class="img-mode full-bleed"><img src="images/page-05.png" alt=""><div class="zoom-hint">点击切换清晰模式</div></div>
+</section>
+<section class="slide no-text-mode" data-index="5">
+  <div class="img-mode full-bleed"><img src="images/page-06.png" alt=""><div class="zoom-hint">点击切换清晰模式</div></div>
+</section>
+<section class="slide no-text-mode" data-index="6">
+  <div class="img-mode full-bleed"><img src="images/page-07.png" alt=""><div class="zoom-hint">点击切换清晰模式</div></div>
+</section>
+<section class="slide no-text-mode" data-index="7">
+  <div class="img-mode full-bleed"><img src="images/page-08.png" alt=""><div class="zoom-hint">点击切换清晰模式</div></div>
+</section>
+
+<!-- ==================== PAGE 9: 服务1 FTO ==================== -->
+<section class="slide" data-index="8">
+  <div class="img-mode"><img src="images/page-09.png" alt="FTO分析"></div>
+  <div class="text-mode">
+    <div class="kicker">SERVICE 01</div>
+    <h1>核心服务一<br>产品出海FTO分析</h1>
+    <div class="grid-2" style="margin-top:2vh">
+      <div>
+        <h3>规避专利侵权风险的安全阀</h3>
+        <ul>
+          <li><span class="highlight">专利检索</span> — 覆盖174个国家/地区</li>
+          <li><span class="highlight">侵权风险评估</span> — 低、中、高三级</li>
+          <li><span class="highlight">规避设计建议</span> — 降低侵权概率80%+</li>
+        </ul>
+      </div>
+      <div>
+        <h3>高专利密度领域应用</h3>
+        <ul>
+          <li>生物医药 — 化合物、制备工艺</li>
+          <li>电子通信 — 标准必要专利(SEPs)</li>
+          <li>机械制造 — 外观设计、供应链</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top:3vh;display:flex;justify-content:space-between;align-items:center;background:var(--accent-light);border-radius:12px;padding:2vh 2vw">
+      <div style="text-align:center;flex:1"><div style="font-size:clamp(24px,2.5vw,40px);font-weight:800;color:var(--accent)">1</div><div style="font-size:clamp(14px,1.1vw,20px)">目标市场确定</div></div>
+      <div style="font-size:clamp(24px,2.5vw,40px);color:var(--accent);font-weight:700">→</div>
+      <div style="text-align:center;flex:1"><div style="font-size:clamp(24px,2.5vw,40px);font-weight:800;color:var(--accent)">2</div><div style="font-size:clamp(14px,1.1vw,20px)">专利检索</div></div>
+      <div style="font-size:clamp(24px,2.5vw,40px);color:var(--accent);font-weight:700">→</div>
+      <div style="text-align:center;flex:1"><div style="font-size:clamp(24px,2.5vw,40px);font-weight:800;color:var(--accent)">3</div><div style="font-size:clamp(14px,1.1vw,20px)">风险分级</div></div>
+      <div style="font-size:clamp(24px,2.5vw,40px);color:var(--accent);font-weight:700">→</div>
+      <div style="text-align:center;flex:1"><div style="font-size:clamp(24px,2.5vw,40px);font-weight:800;color:var(--accent)">4</div><div style="font-size:clamp(14px,1.1vw,20px)">应对策略</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 10: 服务2 专利 ==================== -->
+<section class="slide" data-index="9">
+  <div class="img-mode"><img src="images/page-10.png" alt="专利培育"></div>
+  <div class="text-mode">
+    <div class="kicker">SERVICE 02</div>
+    <h1>核心服务二<br>高价值专利培育与布局</h1>
+    <div class="grid-2" style="margin-top:2vh">
+      <div class="card">
+        <h3>高价值专利培育</h3>
+        <ul>
+          <li>技术挖掘与专利布局</li>
+          <li>专利申请策略优化</li>
+          <li>专利质量评估</li>
+          <li>专利组合管理</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>全球专利布局</h3>
+        <ul>
+          <li>目标市场专利分析</li>
+          <li>竞争对手专利监控</li>
+          <li>专利预警机制</li>
+          <li>专利运营策略</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid-3" style="margin-top:3vh">
+      <div class="stat-card"><div class="num">300%</div><div class="label">效率提升</div></div>
+      <div class="stat-card"><div class="num">85%</div><div class="label">准确率</div></div>
+      <div class="stat-card"><div class="num">40%</div><div class="label">成本降低</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 11: 服务3 分析 ==================== -->
+<section class="slide" data-index="10">
+  <div class="img-mode"><img src="images/page-11.png" alt="全球分析"></div>
+  <div class="text-mode">
+    <div class="kicker">SERVICE 03</div>
+    <h1>核心服务三<br>全球专利局势精准分析</h1>
+    <div class="grid-2" style="margin-top:2vh">
+      <div>
+        <h3>全球专利监控</h3>
+        <ul>
+          <li>实时专利态势追踪</li>
+          <li>竞争对手技术路线</li>
+          <li>行业技术发展趋势</li>
+          <li>专利空白点识别</li>
+        </ul>
+      </div>
+      <div>
+        <h3>精准预警系统</h3>
+        <ul>
+          <li>侵权风险实时预警</li>
+          <li>技术迭代早期信号</li>
+          <li>市场进入时机分析</li>
+          <li>专利纠纷预判</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:3vh">
+      <p class="lead">基于AI的专利分析系统，可处理<span class="highlight">千万级专利数据</span>，提供实时、精准、可操作的全球知识产权情报。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 12: 优势 ==================== -->
+<section class="slide" data-index="11">
+  <div class="img-mode"><img src="images/page-12.png" alt="服务优势"></div>
+  <div class="text-mode">
+    <div class="kicker">ADVANTAGES</div>
+    <h1>AI赋能的服务优势</h1>
+    <p class="lead">效率与质量双提升</p>
+    <div class="grid-4" style="margin-top:3vh">
+      <div class="stat-card"><div class="num">300%</div><div class="label">效率提升</div><div class="change">AI加速</div></div>
+      <div class="stat-card"><div class="num">85%</div><div class="label">准确率</div><div class="change">智能校验</div></div>
+      <div class="stat-card"><div class="num">40%</div><div class="label">成本降低</div><div class="change">自动化</div></div>
+      <div class="stat-card"><div class="num">174</div><div class="label">国家覆盖</div><div class="change">全球网络</div></div>
+    </div>
+    <div class="grid-2" style="margin-top:3vh">
+      <div class="card">
+        <h3>效率优势</h3>
+        <p>AI Agent一键查新，从天级缩短至<span class="highlight">分钟级</span>。自动完成专利检索、风险评估、报告生成。</p>
+      </div>
+      <div class="card">
+        <h3>质量优势</h3>
+        <p>大模型辅助分析，覆盖多维度数据交叉验证，确保<span class="highlight">95%+</span>的分析准确性和完整性。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 13: AI原理 ==================== -->
+<section class="slide" data-index="12">
+  <div class="img-mode"><img src="images/page-13.png" alt="AI原理"></div>
+  <div class="text-mode">
+    <div class="kicker">AI TECHNOLOGY</div>
+    <h1>AI Transformer<br>原理与幻觉</h1>
+    <div class="grid-3" style="margin-top:2vh">
+      <div class="card">
+        <h3>数据表示</h3>
+        <p>万物皆可向量化。LLM将单词映射到高维空间坐标，语义相近的词在数学上距离更近。</p>
+      </div>
+      <div class="card">
+        <h3>Transformer架构</h3>
+        <p>自注意力机制(Self-Attention)让模型同时权衡每个词与其他所有词的关联。</p>
+      </div>
+      <div class="card">
+        <h3>预测机制</h3>
+        <p>基于概率的"猜词"游戏。根据上文计算下一个最可能出现的词，不断重复直到形成完整文本。</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:3vh;border-left-color:var(--warning)">
+      <h3 style="color:var(--warning)">⚠️ 幻觉风险</h3>
+      <p>AI可能生成看似合理但实际错误的信息。在知识产权领域，必须结合<span class="danger">专业人工校验</span>，确保法律准确性。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 14: AI重构 ==================== -->
+<section class="slide" data-index="13">
+  <div class="img-mode"><img src="images/page-14.png" alt="AI重构效率"></div>
+  <div class="text-mode">
+    <div class="kicker">AI TRANSFORMATION</div>
+    <h1>AI技术重构<br>知识产权服务效率</h1>
+    <div class="grid-3" style="margin-top:3vh">
+      <div class="stat-card">
+        <div class="num">3天→3分钟</div>
+        <div class="label">专利检索速度</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">80%</div>
+        <div class="label">人工审核时间减少</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">10x</div>
+        <div class="label">数据处理量提升</div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:3vh">
+      <div class="card">
+        <h3>传统模式</h3>
+        <ul>
+          <li>人工检索：耗时数天</li>
+          <li>纸质报告：易遗漏</li>
+          <li>单一维度：信息不全</li>
+          <li>静态分析：时效滞后</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left-color:var(--success);background:rgba(54,179,126,.08)">
+        <h3 style="color:var(--success)">AI赋能模式</h3>
+        <ul>
+          <li><span class="success">智能检索</span>：分钟级完成</li>
+          <li><span class="success">全景报告</span>：多维度交叉</li>
+          <li><span class="success">实时更新</span>：动态监控</li>
+          <li><span class="success">预测分析</span>：风险预判</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 15: 合作模式 ==================== -->
+<section class="slide" data-index="14">
+  <div class="img-mode"><img src="images/page-15.png" alt="合作模式"></div>
+  <div class="text-mode">
+    <div class="kicker">PARTNERSHIP</div>
+    <h1>差异化服务方案</h1>
+    <div class="grid-3" style="margin-top:3vh">
+      <div class="stat-card" style="border-top:4px solid var(--accent)">
+        <div class="num" style="font-size:clamp(28px,3.5vw,56px)">基础版</div>
+        <div class="label">SaaS自助服务</div>
+        <p style="font-size:clamp(14px,1.2vw,20px);margin-top:2vh">AI工具自助使用<br>标准报告输出<br>在线技术支持</p>
+      </div>
+      <div class="stat-card" style="border-top:4px solid var(--warning)">
+        <div class="num" style="font-size:clamp(28px,3.5vw,56px);color:var(--warning)">专业版</div>
+        <div class="label">专家+AI协同</div>
+        <p style="font-size:clamp(14px,1.2vw,20px);margin-top:2vh">专家全程参与<br>定制化分析<br>深度咨询报告</p>
+      </div>
+      <div class="stat-card" style="border-top:4px solid var(--success)">
+        <div class="num" style="font-size:clamp(28px,3.5vw,56px);color:var(--success)">旗舰版</div>
+        <div class="label">全托管服务</div>
+        <p style="font-size:clamp(14px,1.2vw,20px);margin-top:2vh">全程托管<br>全球布局<br>战略级知识产权管理</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:3vh">
+      <p class="lead">上海技术交易所 × 智鸽科技联合服务，提供从<span class="highlight">专利检索到全球布局</span>的一站式知识产权出海解决方案。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PAGE 16: 纯图片 ==================== -->
+<section class="slide" data-index="15">
+  <div class="img-mode full-bleed"><img src="images/page-16.png" alt=""><div class="zoom-hint">点击切换清晰模式</div></div>
+</section>
+
+<!-- ==================== PAGE 17: 结尾 ==================== -->
+<section class="slide" data-index="16">
+  <div class="img-mode full-bleed"><img src="images/page-17.png" alt="结尾"></div>
+  <div class="text-mode" style="justify-content:center;align-items:center;text-align:center;background:linear-gradient(135deg,#0a1628 0%,#1a3a6c 50%,#0052cc 100%)">
+    <div class="kicker" style="color:#7eb8ff">CONCLUSION</div>
+    <h1 style="color:#fff">开启AI驱动的<br>知识产权服务新篇章</h1>
+    <p class="lead" style="color:rgba(255,255,255,.8);margin-top:3vh">上海技术交易所 × 智鸽科技</p>
+    <div style="display:flex;gap:3vw;margin-top:5vh;justify-content:center">
+      <div style="text-align:center"><div style="font-size:clamp(28px,3vw,48px);color:#fff;font-weight:700">🛡</div><div style="color:rgba(255,255,255,.7);font-size:clamp(14px,1.2vw,20px);margin-top:1vh">保护创新</div></div>
+      <div style="text-align:center"><div style="font-size:clamp(28px,3vw,48px);color:#fff;font-weight:700">🚀</div><div style="color:rgba(255,255,255,.7);font-size:clamp(14px,1.2vw,20px);margin-top:1vh">助力出海</div></div>
+      <div style="text-align:center"><div style="font-size:clamp(28px,3vw,48px);color:#fff;font-weight:700">💡</div><div style="color:rgba(255,255,255,.7);font-size:clamp(14px,1.2vw,20px);margin-top:1vh">AI赋能</div></div>
+    </div>
+    <div style="margin-top:6vh;color:rgba(255,255,255,.5);font-size:clamp(14px,1.2vw,20px)">CMEF 2025</div>
+  </div>
+</section>
+
+</div><!-- /deck -->
+
+<!-- ==================== 导航控件 ==================== -->
+<div id="nav">
+  <button id="btn-prev" title="上一页">‹</button>
+  <span class="page-num"><span id="curr">1</span> / <span id="total">17</span></span>
+  <button id="btn-next" title="下一页">›</button>
+  <button id="btn-clear" class="toggle-btn" title="切换清晰模式">清晰模式</button>
+  <button id="btn-full" class="toggle-btn" title="全屏">⛶</button>
+</div>
+
+<script>
+(function(){
+  const deck=document.getElementById('deck');
+  const slides=Array.from(document.querySelectorAll('.slide'));
+  const total=slides.length;
+  let current=0;
+  let clearMode=false;
+  
+  function update(){
+    deck.style.transform='translateX(-'+(current*100)+'vw)';
+    document.getElementById('curr').textContent=current+1;
+    document.getElementById('total').textContent=total;
+    document.getElementById('progress').style.width=((current+1)/total*100)+'%';
+    slides.forEach((s,i)=>s.classList.toggle('active',i===current));
+  }
+  
+  function goTo(idx){
+    if(idx<0)idx=0;if(idx>=total)idx=total-1;
+    current=idx;update();
+  }
+  
+  function next(){goTo(current+1)}
+  function prev(){goTo(current-1)}
+  
+  function toggleClear(){
+    clearMode=!clearMode;
+    slides.forEach(s=>s.classList.toggle('clear-mode',clearMode));
+    document.getElementById('btn-clear').classList.toggle('active',clearMode);
+  }
+  
+  // 点击slide切换模式
+  slides.forEach(s=>{
+    s.addEventListener('click',e=>{
+      if(e.target.closest('#nav'))return;
+      toggleClear();
+    });
+  });
+  
+  document.getElementById('btn-prev').addEventListener('click',prev);
+  document.getElementById('btn-next').addEventListener('click',next);
+  document.getElementById('btn-clear').addEventListener('click',toggleClear);
+  document.getElementById('btn-full').addEventListener('click',()=>{
+    if(!document.fullscreenElement){document.documentElement.requestFullscreen()}
+    else{document.exitFullscreen()}
+  });
+  
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' ')next();
+    if(e.key==='ArrowLeft')prev();
+    if(e.key==='c'||e.key==='C')toggleClear();
+    if(e.key==='f'||e.key==='F'){
+      if(!document.fullscreenElement){document.documentElement.requestFullscreen()}
+      else{document.exitFullscreen()}
+    }
+  });
+  
+  let wheelTimeout;
+  document.addEventListener('wheel',e=>{
+    clearTimeout(wheelTimeout);
+    wheelTimeout=setTimeout(()=>{
+      if(e.deltaY>0)next();
+      else if(e.deltaY<0)prev();
+    },50);
+  },{passive:true});
+  
+  let touchStartX=0;
+  document.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX},{passive:true});
+  document.addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].clientX-touchStartX;
+    if(Math.abs(dx)>50){dx<0?next():prev()}
+  },{passive:true});
+  
+  // 显示提示
+  const hint=document.getElementById('hint');
+  hint.classList.add('show');
+  setTimeout(()=>hint.classList.remove('show'),4000);
+  
+  update();
+})();
+</script>
+</body>
+</html>
